@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>F Minor Bass Tunings Visualizer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #202124;
+      color: #f1f3f4;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      flex: 1 1 33%;
+      border-bottom: 1px solid #444;
+      position: relative;
+    }
+
+    .panel:last-child {
+      border-bottom: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .label {
+      position: absolute;
+      top: 4px;
+      left: 12px;
+      font-size: 14px;
+      color: #e8eaed;
+      text-shadow: 0 0 3px #000;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <!-- Tuning 1: F–Bb–Eb–Ab -->
+  <div class="panel">
+    <canvas id="tuning1"></canvas>
+  </div>
+
+  <!-- Tuning 2: C–F–Bb–Eb -->
+  <div class="panel">
+    <canvas id="tuning2"></canvas>
+  </div>
+
+  <!-- Tuning 3: Bb–Eb–Ab–Db -->
+  <div class="panel">
+    <canvas id="tuning3"></canvas>
+  </div>
+
+  <script>
+    // 12-tone chromatic scale using flats only
+    const NOTE_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+    // Build a map from note name to index
+    const NOTE_INDEX = {};
+    NOTE_NAMES.forEach((n, i) => { NOTE_INDEX[n] = i; });
+
+    // F natural minor: F G Ab Bb C Db Eb
+    const F_MINOR_NOTES = new Set(["F", "G", "Ab", "Bb", "C", "Db", "Eb"]);
+
+    const tunings = [
+      {
+        canvasId: "tuning1",
+        name: "Tuning 1: F–Bb–Eb–Ab",
+        strings: ["F", "Bb", "Eb", "Ab"]
+      },
+      {
+        canvasId: "tuning2",
+        name: "Tuning 2: C–F–Bb–Eb",
+        strings: ["C", "F", "Bb", "Eb"]
+      },
+      {
+        canvasId: "tuning3",
+        name: "Tuning 3: Bb–Eb–Ab–Db",
+        strings: ["Bb", "Eb", "Ab", "Db"]
+      }
+    ];
+
+    function drawFretboard(canvas, tuning) {
+      const ctx = canvas.getContext("2d");
+
+      // Match canvas internal size to its displayed size
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const numFrets = 13; // 0–12
+      const numStrings = tuning.strings.length;
+
+      const topMargin = 30;
+      const leftMargin = 45;
+      const rightMargin = 10;
+      const bottomMargin = 10;
+
+      const usableWidth = w - leftMargin - rightMargin;
+      // Make frets (string lanes) 30% shorter
+      const usableHeight = (h - topMargin - bottomMargin) * 0.7;
+
+      const fretWidth = usableWidth / numFrets;
+      const stringHeight = usableHeight / numStrings;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Double the note label size (12px -> 24px)
+      ctx.font = "24px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Background
+      ctx.fillStyle = "#202124";
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw fret numbers
+      ctx.fillStyle = "#e8eaed";
+      for (let f = 0; f < numFrets; f++) {
+        const x = leftMargin + f * fretWidth + fretWidth / 2;
+        ctx.fillText(f.toString(), x, topMargin - 12);
+      }
+
+      // Draw strings & notes
+      // Render like a standard 4-string bass: lowest pitch (E) at the bottom,
+      // then A above, D above, G on top. We treat tuning.strings[0] as lowest.
+      for (let s = 0; s < numStrings; s++) {
+        const openNote = tuning.strings[s];
+        const openIndex = NOTE_INDEX[openNote];
+        const y = topMargin + (numStrings - 1 - s) * stringHeight;
+
+        // String label on the left (open string note)
+        ctx.fillStyle = "#e8eaed";
+        ctx.textAlign = "right";
+        ctx.fillText(openNote, leftMargin - 8, y + stringHeight / 2);
+
+        // Reset for cell drawing
+        ctx.textAlign = "center";
+
+        for (let f = 0; f < numFrets; f++) {
+          const x = leftMargin + f * fretWidth;
+          const noteIndex = (openIndex + f) % NOTE_NAMES.length;
+          const noteName = NOTE_NAMES[noteIndex];
+
+          const isInFMinor = F_MINOR_NOTES.has(noteName);
+
+          // Highlight F-minor notes, especially visible on open strings
+          if (isInFMinor) {
+            ctx.fillStyle = f === 0 ? "#fdd26e" : "#514a2b"; // brighter for open
+          } else {
+            ctx.fillStyle = "#3c4043";
+          }
+
+          // Draw cell
+          ctx.fillRect(x + 1, y + 1, fretWidth - 2, stringHeight - 2);
+
+          // Border
+          ctx.strokeStyle = "#5f6368";
+          ctx.lineWidth = f === 0 ? 2 : 1;
+          ctx.strokeRect(x + 1, y + 1, fretWidth - 2, stringHeight - 2);
+
+          // Note text
+          ctx.fillStyle = "#f1f3f4";
+          ctx.fillText(noteName, x + fretWidth / 2, y + stringHeight / 2);
+        }
+      }
+    }
+
+    function init() {
+      tunings.forEach(tuning => {
+        const canvas = document.getElementById(tuning.canvasId);
+        if (canvas) {
+          drawFretboard(canvas, tuning);
+        }
+      });
+    }
+
+    window.addEventListener("load", init);
+    window.addEventListener("resize", init);
+  </script>
+</body>
+</html>
